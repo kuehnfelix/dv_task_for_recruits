@@ -25,10 +25,7 @@ class CarState:
 
 
 def calc_centerline(cones: list[Cone], car_state: CarState) -> list[Point2D]:
-    points = [Point2D(cone.x, cone.y) for cone in cones if cone.color == Color.YELLOW]
-    return points
-
-def control_car(centerline: list[Point2D], car_state: CarState) -> tuple[float, float]:
+    """This is the task you need to implement. Given a list of cones and the car's state, return a list of points that represent the centerline of the track."""
     return None
 
 

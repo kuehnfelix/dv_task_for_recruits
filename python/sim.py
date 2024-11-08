@@ -23,7 +23,9 @@ class Sim:
 
         self.fig, self.ax = plt.subplots()
         self.scatter = None
+        self.arrow = self.ax.arrow(0, 0, 1, 0, head_width=0.1, head_length=0.1, fc='blue', ec='blue')
         self.car_arrow = None
+        
         self.ax.set_aspect('equal')
 
     def load_track_from_csv(self, file_path):
@@ -57,6 +59,8 @@ class Sim:
         if x and y:
             self.ax.set_xlim(min(x) - 1, max(x) + 1)
             self.ax.set_ylim(min(y) - 1, max(y) + 1)
+
+        
         
 
 # Plot the car as an arrow
@@ -68,14 +72,12 @@ class Sim:
             dx = car_length * np.cos(car_theta)
             dy = car_length * np.sin(car_theta)
 
-            # If there's no existing car arrow, create one, otherwise update its position and angle
-            if self.car_arrow is None:
-                self.car_arrow = FancyArrowPatch((car_x, car_y), (car_x + dx, car_y + dy),
-                                                 mutation_scale=20, color='black', arrowstyle='->')
-                self.ax.add_patch(self.car_arrow)  # Add the arrow to the plot
-            else:
-                # Update the car arrow position and direction using set_ends
-                self.car_arrow.set_ends(car_x, car_y, car_x + dx, car_y + dy)
+            self.arrow.remove()
+            self.arrow = self.ax.arrow(car_x, car_y, dx, dy, head_width=0.1, head_length=0.1, fc='blue', ec='blue')
+        
+        centerline_x = [c.x for c in self.centerline]
+        centerline_y = [c.y for c in self.centerline]
+        self.ax.plot(centerline_x, centerline_y, 'r-')
 
 
         plt.draw()
@@ -83,9 +85,25 @@ class Sim:
 
     def simulation_step(self):
         self.visible_cones = list(self.get_visible_cones())
-        centerline = task.calc_centerline(self.visible_cones, self.car_state)
-        self.car_state.x = centerline[3].x
-        self.car_state.y = centerline[3].y
+# visible cones should be transformed here to the car's frame of reference
+        transformed_cones = []
+
+        for cone in self.visible_cones:
+            # Translate cone position relative to the car
+            dx = cone.x - self.car_state.x
+            dy = cone.y - self.car_state.y
+
+            # Rotate according to the car's heading (theta)
+            rotated_x = dx * np.cos(-self.car_state.theta) - dy * np.sin(-self.car_state.theta)
+            rotated_y = dx * np.sin(-self.car_state.theta) + dy * np.cos(-self.car_state.theta)
+
+            transformed_cones.append(Cone(cone.color, rotated_x, rotated_y))
+
+        self.centerline = task.calc_centerline(transformed_cones, self.car_state)
+        self.car_state.x = self.centerline[3].x
+        self.car_state.y = self.centerline[3].y
+        self.car_state.theta = math.atan2(self.centerline[3].y - self.centerline[2].y, self.centerline[3].x - self.centerline[2].x)
+
         
         pass
 
