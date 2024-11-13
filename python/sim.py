@@ -20,6 +20,7 @@ class Sim:
         self.cones = []
         self.visible_cones = []
         self.car_state = CarState(0, 0, 0)
+        self.centerline = []
 
         self.fig, self.ax = plt.subplots()
         self.scatter = None
@@ -39,13 +40,13 @@ class Sim:
                     self.cones.append(Cone(Color.YELLOW, float(row[1]), float(row[2])))
                 elif row[0] == "ORANGE":
                     self.cones.append(Cone(Color.ORANGE, float(row[1]), float(row[2])))
-
         
     def get_visible_cones(self) -> Generator[Cone, None, None]:
         for c in self.cones:
-            if ( (c.x-self.car_state.x)**2 + (c.y-self.car_state.y)**2 ) < 625:
-                detection_angle = pi_to_pi(math.atan2(c.y-self.car_state.y, c.x-self.car_state.x) - self.car_state.theta)
-                if math.fabs(detection_angle) < 60:
+            distance_squared = (c.x-self.car_state.x)**2 + (c.y-self.car_state.y)**2
+            if distance_squared  < 625 and distance_squared > 4:
+                detection_angle = pi_to_pi(pi_to_pi(math.atan2(c.y-self.car_state.y, c.x-self.car_state.x)) - pi_to_pi(self.car_state.theta))
+                if math.fabs(detection_angle) < 60/180*math.pi:
                     yield c
 
     def visualize(self):
@@ -56,14 +57,24 @@ class Sim:
         self.ax.clear()
         self.scatter = self.ax.scatter(x, y, c=color, s=50)
 
-        if x and y:
-            self.ax.set_xlim(min(x) - 1, max(x) + 1)
-            self.ax.set_ylim(min(y) - 1, max(y) + 1)
+        if self.car_state:
+            car_x, car_y, car_theta = self.car_state.x, self.car_state.y, self.car_state.theta
 
-        
-        
+            # Define the box size
+            box_length = 25
 
-# Plot the car as an arrow
+            d_x = (box_length/2) * np.cos(car_theta)
+            d_y = (box_length/2) * np.sin(car_theta)
+
+            center_x = car_x + d_x
+            center_y = car_y + d_y
+
+            self.ax.set_xlim(center_x - 15, center_x + 15)
+            self.ax.set_ylim(center_y - 15, center_y + 15)
+            self.ax.plot([center_x],[center_y], 'ro')
+
+
+        # Plot the car as an arrow
         if self.car_state:
             car_x, car_y, car_theta = self.car_state.x, self.car_state.y, self.car_state.theta
             car_length = 1.0  # Length of the car's arrow (visual representation)
@@ -73,7 +84,7 @@ class Sim:
             dy = car_length * np.sin(car_theta)
 
             self.arrow.remove()
-            self.arrow = self.ax.arrow(car_x, car_y, dx, dy, head_width=0.1, head_length=0.1, fc='blue', ec='blue')
+            self.arrow = self.ax.arrow(car_x, car_y, dx, dy, head_width=0.5, head_length=0.5, fc='blue', ec='blue', width=0.1)
         
         centerline_x = [c.x for c in self.centerline]
         centerline_y = [c.y for c in self.centerline]
@@ -81,11 +92,19 @@ class Sim:
 
 
         plt.draw()
-        plt.pause(1.1)
+        plt.pause(0.035)
 
     def simulation_step(self):
+        # Update car position
+        if self.centerline is not None and len(self.centerline) >0:
+            direction_vector = [self.centerline[0].x- self.car_state.x, self.centerline[0].y - self.car_state.y]
+            direction_norm = np.linalg.norm(direction_vector)
+            self.car_state.x += direction_vector[0] / direction_norm * 0.1
+            self.car_state.y += direction_vector[1] / direction_norm * 0.1
+            self.car_state.theta = math.atan2(direction_vector[1], direction_vector[0])
+
         self.visible_cones = list(self.get_visible_cones())
-# visible cones should be transformed here to the car's frame of reference
+        # visible cones should be transformed here to the car's frame of reference
         transformed_cones = []
 
         for cone in self.visible_cones:
@@ -96,16 +115,10 @@ class Sim:
             # Rotate according to the car's heading (theta)
             rotated_x = dx * np.cos(-self.car_state.theta) - dy * np.sin(-self.car_state.theta)
             rotated_y = dx * np.sin(-self.car_state.theta) + dy * np.cos(-self.car_state.theta)
-
             transformed_cones.append(Cone(cone.color, rotated_x, rotated_y))
 
         self.centerline = task.calc_centerline(transformed_cones, self.car_state)
-        self.car_state.x = self.centerline[3].x
-        self.car_state.y = self.centerline[3].y
-        self.car_state.theta = math.atan2(self.centerline[3].y - self.centerline[2].y, self.centerline[3].x - self.centerline[2].x)
-
         
-        pass
 
 
 if __name__ == "__main__":
