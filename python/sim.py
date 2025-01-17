@@ -11,6 +11,7 @@ from matplotlib.patches import FancyArrowPatch
 import matplotlib.pyplot as plt
 plt.ion()
 from typing import Generator
+import time
 
 def pi_to_pi(x: float):
     return math.remainder(x, 2*math.pi)
@@ -81,10 +82,8 @@ class Sim:
             dx = car_length * np.cos(car_theta)
             dy = car_length * np.sin(car_theta)
 
-
             self.arrow.set_positions((car_x, car_y), (car_x + dx, car_y + dy))
             self.ax.add_patch(self.arrow)
-
             
         centerline_x = [c.x for c in self.centerline]
         centerline_y = [c.y for c in self.centerline]
@@ -97,7 +96,19 @@ class Sim:
     def simulation_step(self):
         # Update car position
         if self.centerline is not None and len(self.centerline) >0:
-            direction_vector = [self.centerline[0].x- self.car_state.x, self.centerline[0].y - self.car_state.y]
+            def find_point_on_centerline_with_distance(centerline, distance):
+                total_distance = 0
+                for i in range(1, len(centerline)):
+                    p1 = centerline[i-1]
+                    p2 = centerline[i]
+                    segment_distance = math.hypot(p1.x - p2.x, p1.y - p2.y)
+                    if total_distance + segment_distance > distance:
+                        ratio = (distance - total_distance) / segment_distance
+                        return Point2D(p1.x + (p2.x - p1.x) * ratio, p1.y + (p2.y - p1.y) * ratio)
+                    total_distance += segment_distance
+                return centerline[0]
+            goal_point = find_point_on_centerline_with_distance(self.centerline, 0.1)
+            direction_vector = [goal_point.x- self.car_state.x, goal_point.y - self.car_state.y]
             direction_norm = np.linalg.norm(direction_vector)
             self.car_state.x += direction_vector[0] / direction_norm * 0.1
             self.car_state.y += direction_vector[1] / direction_norm * 0.1
@@ -124,6 +135,11 @@ class Sim:
 if __name__ == "__main__":
     sim = Sim()
     sim.load_track_from_csv("track.csv")
-    while 1:        
+    while True:
+        start_time = time.time()
+        
         sim.simulation_step()
         sim.visualize()
+        
+        elapsed_time = time.time() - start_time
+        time.sleep(max(0, 0.03 - elapsed_time))
