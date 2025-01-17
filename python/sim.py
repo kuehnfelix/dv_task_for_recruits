@@ -24,8 +24,7 @@ class Sim:
 
         self.fig, self.ax = plt.subplots()
         self.scatter = None
-        self.arrow = self.ax.arrow(0, 0, 1, 0, head_width=0.1, head_length=0.1, fc='blue', ec='blue')
-        self.car_arrow = None
+        self.arrow = FancyArrowPatch((0,0), (1,1), mutation_scale=20, color='blue', arrowstyle='->')
         
         self.ax.set_aspect('equal')
 
@@ -71,7 +70,6 @@ class Sim:
 
             self.ax.set_xlim(center_x - 15, center_x + 15)
             self.ax.set_ylim(center_y - 15, center_y + 15)
-            self.ax.plot([center_x],[center_y], 'ro')
 
 
         # Plot the car as an arrow
@@ -83,9 +81,11 @@ class Sim:
             dx = car_length * np.cos(car_theta)
             dy = car_length * np.sin(car_theta)
 
-            self.arrow.remove()
-            self.arrow = self.ax.arrow(car_x, car_y, dx, dy, head_width=0.5, head_length=0.5, fc='blue', ec='blue', width=0.1)
-        
+
+            self.arrow.set_positions((car_x, car_y), (car_x + dx, car_y + dy))
+            self.ax.add_patch(self.arrow)
+
+            
         centerline_x = [c.x for c in self.centerline]
         centerline_y = [c.y for c in self.centerline]
         self.ax.plot(centerline_x, centerline_y, 'r-')
